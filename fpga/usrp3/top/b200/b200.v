@@ -57,8 +57,8 @@ module b200
     input         codec_main_clk_n,
 
     // Debug Bus
-    output [31:0] debug,
-    output [ 1:0] debug_clk,
+    inout  [31:0] debug,
+    inout  [ 1:0] debug_clk,
 
     // GPIF, FX3 Slave FIFO
     output        IFCLK,      // pclk
@@ -192,8 +192,110 @@ module b200
   ///////////////////////////////////////////////////////////////////////
   // I/O
   ///////////////////////////////////////////////////////////////////////
-  wire [31:0] rx_data0, rx_data1;
   wire [31:0] tx_data0, tx_data1;
+  wire [31:0] rx_data0 = {tx_data0[31:20], 4'h0, tx_data0[15:4], 4'h0};
+  wire [31:0] rx_data1 = {tx_data1[31:20], 4'h0, tx_data1[15:4], 4'h0};
+  
+  wire        tx_wave_reset = reset_global;
+  wire        tx_wave_clock = debug[ 0];
+  wire        tx_wave_frame = debug[ 1];
+  wire [11:0] tx_wave;
+  assign tx_wave[ 0] = debug[ 2];
+  assign tx_wave[ 1] = debug[ 3];
+  assign tx_wave[ 2] = debug[ 4];
+  assign tx_wave[ 3] = debug[ 5];
+  assign tx_wave[ 4] = debug[ 6];
+  assign tx_wave[ 5] = debug[ 7];
+  assign tx_wave[ 6] = debug[ 8];
+  assign tx_wave[ 7] = debug[ 9];
+  assign tx_wave[ 8] = debug[10];
+  assign tx_wave[ 9] = debug[11];
+  assign tx_wave[10] = debug[12];
+  assign tx_wave[11] = debug[13];
+  assign debug[14] = 1'b0;
+  assign debug[15] = 1'b0;
+  reg         tx_wave_frame_r0, tx_wave_frame_r1;
+  reg  [11:0] tx_wave_r0, tx_wave_r1, tx_wave_re, tx_wave_im;
+  wire [11:0] tx_data_re, tx_data_im;
+  always @(posedge tx_wave_clock or posedge tx_wave_reset) begin
+    if (tx_wave_reset == 1'b1) begin
+      tx_wave_frame_r0 <= 1'b0;
+      tx_wave_frame_r1 <= 1'b0;
+      tx_wave_r0 <= 12'h000;
+      tx_wave_r1 <= 12'h000;
+      tx_wave_re <= 12'h000;
+      tx_wave_im <= 12'h000;
+    end else begin
+      tx_wave_frame_r0 <= tx_wave_frame;
+      tx_wave_frame_r1 <= tx_wave_frame_r0;
+      tx_wave_r0 <= tx_wave;
+      tx_wave_r1 <= tx_wave_r0;
+      if (tx_wave_frame_r1 == 1'b0 && tx_wave_frame_r0 == 1'b1) begin
+        tx_wave_re <= tx_wave_r1;
+        tx_wave_im <= tx_wave_r0;
+      end
+    end
+  end
+
+  reg         rx_wave_clock;
+  assign debug[16] = rx_wave_clock;
+  reg         rx_wave_frame;
+  assign debug[17] = rx_wave_frame;
+  reg  [ 2:0] rx_wave_clock_count;
+  wire        rx_wave_reset = reset_global;
+  reg  [11:0] rx_wave, rx_wave_re, rx_wave_im;
+  assign debug[18] = rx_wave[ 0];
+  assign debug[19] = rx_wave[ 1];
+  assign debug[20] = rx_wave[ 2];
+  assign debug[21] = rx_wave[ 3];
+  assign debug[22] = rx_wave[ 4];
+  assign debug[23] = rx_wave[ 5];
+  assign debug[24] = rx_wave[ 6];
+  assign debug[25] = rx_wave[ 7];
+  assign debug[26] = rx_wave[ 8];
+  assign debug[27] = rx_wave[ 9];
+  assign debug[28] = rx_wave[10];
+  assign debug[29] = rx_wave[11];
+  assign debug[30] = 1'b0;
+  assign debug[31] = 1'b0;
+  wire [11:0] rx_data_re, rx_data_im;
+  always @(posedge bus_clk) begin
+    if (rx_wave_reset == 1'b1) begin
+      rx_wave_clock_count <= 3'b000;
+      rx_wave_clock <= 1'b0;
+    end else begin
+      rx_wave_clock_count <= rx_wave_clock_count + 1'b1;
+      if (rx_wave_clock_count == 3'b000) begin
+        rx_wave_clock <= 1'b0;
+      end else if (rx_wave_clock_count == 3'b010) begin
+        rx_wave_clock <= 1'b1;
+      end else if (rx_wave_clock_count == 3'b100) begin
+        rx_wave_clock <= 1'b0;
+      end else if (rx_wave_clock_count == 3'b110) begin
+        rx_wave_clock <= 1'b1;
+      end
+    end
+    if (rx_wave_reset == 1'b1) begin
+      rx_wave_re    <= 12'h000;
+      rx_wave_im    <= 12'h000;
+      rx_wave       <= 12'h000;
+      rx_wave_frame <= 1'b0;
+    end else if (rx_data_re == 12'h000 && rx_data_im == 12'h000) begin
+      rx_wave_re    <= 12'h000;
+      rx_wave_im    <= 12'h000;
+      rx_wave       <= 12'h000;
+      rx_wave_frame <= 1'b0;
+    end else if (rx_wave_clock_count == 3'b000) begin
+      rx_wave_re    <= rx_data_re;
+      rx_wave_im    <= rx_data_im;
+      rx_wave       <= rx_data_re;
+      rx_wave_frame <= 1'b0;
+    end else if (rx_wave_clock_count == 3'b100) begin
+      rx_wave       <= rx_wave_im;
+      rx_wave_frame <= 1'b1;
+    end
+  end
+
   wire mimo;
    
   b200_io b200_io_i0 (
@@ -202,14 +304,14 @@ module b200
     
     // Baseband sample interface
     .radio_clk(radio_clk),
-    .rx_i0(rx_data0[31:20]), 
-    .rx_q0(rx_data0[15:4]), 
-    .rx_i1(rx_data1[31:20]), 
-    .rx_q1(rx_data1[15:4]),
-    .tx_i0(tx_data0[31:20]), 
-    .tx_q0(tx_data0[15:4]), 
-    .tx_i1(tx_data1[31:20]), 
-    .tx_q1(tx_data1[15:4]),
+    .rx_i0(rx_data_re), 
+    .rx_q0(rx_data_im), 
+    .rx_i1(), 
+    .rx_q1(),
+    .tx_i0(tx_data_re), 
+    .tx_q0(tx_data_im), 
+    .tx_i1(tx_data_re), 
+    .tx_q1(tx_data_im),
     
     // Catalina interface   
     .rx_clk(codec_data_clk_p), 
@@ -219,11 +321,6 @@ module b200
     .tx_frame(tx_frame_p), 
     .tx_data(tx_codec_d) 
   );
-   
-  assign rx_data0[19:16] = 4'h0;
-  assign rx_data0[ 3: 0] = 4'h0;
-  assign rx_data1[19:16] = 4'h0;
-  assign rx_data1[ 3: 0] = 4'h0;
    
   ///////////////////////////////////////////////////////////////////////
   // SPI connections
@@ -256,7 +353,6 @@ module b200
   wire ctrl_tlast, resp_tlast, rx_tlast, tx_tlast;
   wire ctrl_tvalid, resp_tvalid, rx_tvalid, tx_tvalid;
   wire ctrl_tready, resp_tready, rx_tready, tx_tready;
-
 
   ///////////////////////////////////////////////////////////////////////
   // frontend assignments
@@ -292,7 +388,7 @@ module b200
   ///////////////////////////////////////////////////////////////////////
   wire [9:0] fp_gpio_in, fp_gpio_out, fp_gpio_ddr;
 
-  b200_core #
+  b200_core #(
     .EXTRA_BUFF_SIZE(12)
   ) b200_core (
     .bus_clk(bus_clk),
@@ -381,10 +477,5 @@ module b200
     .resp_tdata(resp_tdata), .resp_tlast(resp_tlast),  .resp_tvalid(resp_tvalid), .resp_tready(resp_tready),
     .debug()
   );
-
-  ///////////////////////////////////////////////////////////////////////
-  // Debug port
-  ///////////////////////////////////////////////////////////////////////
-  assign debug = 0;
 
 endmodule // B200
