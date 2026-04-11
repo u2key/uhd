@@ -435,7 +435,16 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
     start_time_type start_time(std::chrono::steady_clock::now());
     std::cout << boost::format("[%s] Creating the usrp device with: %s...") % NOW() % args
               << std::endl;
-    uhd::usrp::multi_usrp::sptr usrp = uhd::usrp::multi_usrp::make(args);
+
+    // User-defined section begin
+    std::string custom_fpga_path = "U:\\home\\ubuntu\\uhd\\fpga\\usrp3\\top\\b200\\build-B210\\b200.bit";
+    uhd::device_addr_t custom_args(args);
+    if (!custom_fpga_path.empty()) {
+        custom_args["fpga"] = custom_fpga_path;
+        std::cout << "Loading custom FPGA image from: " << custom_fpga_path << std::endl;
+    }
+    uhd::usrp::multi_usrp::sptr usrp = uhd::usrp::multi_usrp::make(custom_args);
+    // User-defined section end
 
     // always select the subdevice first, the channel mapping affects the other settings
     if (vm.count("rx_subdev")) {
@@ -564,6 +573,21 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         usrp->set_time_unknown_pps(uhd::time_spec_t(0.0));
     } else {
         usrp->set_time_now(0.0);
+        
+        // User-defined section begin
+        double target_freq = 2.4e9; // 2.4GHz
+        std::cout << boost::format("[%s] Setting RF frequency to %f MHz...") % NOW() % (target_freq / 1e6) << std::endl;
+        if (vm.count("rx_rate")) {
+            for (size_t ch : rx_channel_nums) {
+                usrp->set_rx_freq(uhd::tune_request_t(target_freq), ch);
+            }
+        }
+        if (vm.count("tx_rate")) {
+            for (size_t ch : tx_channel_nums) {
+                usrp->set_tx_freq(uhd::tune_request_t(target_freq), ch);
+            }
+        }
+        // User-defined section end
     }
 
     // spawn the receive test thread
