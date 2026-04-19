@@ -212,12 +212,39 @@ module b200
   assign tx_wave[ 9] = debug[20];
   assign tx_wave[10] = debug[19];
   assign tx_wave[11] = debug[18];
+  assign debug[31] = 1'bz;
+  assign debug[30] = 1'bz;
+  assign debug[29] = 1'bz;
+  assign debug[28] = 1'bz;
+  assign debug[27] = 1'bz;
+  assign debug[26] = 1'bz;
+  assign debug[25] = 1'bz;
+  assign debug[24] = 1'bz;
+  assign debug[23] = 1'bz;
+  assign debug[22] = 1'bz;
+  assign debug[21] = 1'bz;
+  assign debug[20] = 1'bz;
+  assign debug[19] = 1'bz;
+  assign debug[18] = 1'bz;
   assign debug[17] = 1'b0;
   assign debug[16] = 1'b0;
+  reg         tx_wave_clock_sync0, tx_wave_clock_sync1, tx_wave_clock_sync2;
+  reg         tx_wave_frame_sync0, tx_wave_frame_sync1, tx_wave_frame_sync2;
+  reg         tx_wave_sync0, tx_wave_sync1, tx_wave_sync2;
+  wire        tx_wave_clock_edge = (tx_wave_clock_sync2 == 1'b0 && tx_wave_clock_sync1 == 1'b1);
   reg         tx_wave_frame_r0, tx_wave_frame_r1;
   reg  [11:0] tx_wave_r0, tx_wave_r1, tx_wave_re, tx_wave_im;
   wire [11:0] tx_data_re, tx_data_im;
-  always @(posedge tx_wave_clock or posedge tx_wave_reset) begin
+  always @(posedge bus_clk) begin
+    tx_wave_clock_sync0 <= tx_wave_clock;
+    tx_wave_clock_sync1 <= tx_wave_clock_sync0;
+    tx_wave_clock_sync2 <= tx_wave_clock_sync1;
+    tx_wave_frame_sync0 <= tx_wave_frame;
+    tx_wave_frame_sync1 <= tx_wave_frame_sync0;
+    tx_wave_frame_sync2 <= tx_wave_frame_sync1;
+    tx_wave_sync0 <= tx_wave;
+    tx_wave_sync1 <= tx_wave_sync0;
+    tx_wave_sync2 <= tx_wave_sync1;
     if (tx_wave_reset == 1'b1) begin
       tx_wave_frame_r0 <= 1'b0;
       tx_wave_frame_r1 <= 1'b0;
@@ -225,10 +252,10 @@ module b200
       tx_wave_r1 <= 12'h000;
       tx_wave_re <= 12'h000;
       tx_wave_im <= 12'h000;
-    end else begin
-      tx_wave_frame_r0 <= tx_wave_frame;
+    end else if (tx_wave_clock_edge == 1'b1) begin
+      tx_wave_frame_r0 <= tx_wave_frame_sync2;
       tx_wave_frame_r1 <= tx_wave_frame_r0;
-      tx_wave_r0 <= tx_wave;
+      tx_wave_r0 <= tx_wave_sync2;
       tx_wave_r1 <= tx_wave_r0;
       if (tx_wave_frame_r1 == 1'b0 && tx_wave_frame_r0 == 1'b1) begin
         tx_wave_re <= tx_wave_r1;
@@ -236,6 +263,8 @@ module b200
       end
     end
   end
+  assign tx_data_re = tx_wave_re;
+  assign tx_data_im = tx_wave_im;
 
   reg         rx_wave_clock;
   assign debug[15] = rx_wave_clock;
@@ -304,14 +333,14 @@ module b200
     
     // Baseband sample interface
     .radio_clk(radio_clk),
-    .rx_i0(rx_data_re), 
-    .rx_q0(rx_data_im), 
-    .rx_i1(), 
-    .rx_q1(),
+    .rx_i0(), 
+    .rx_q0(), 
+    .rx_i1(rx_data_re), 
+    .rx_q1(rx_data_im),
     .tx_i0(tx_data_re), 
     .tx_q0(tx_data_im), 
-    .tx_i1(tx_data_re), 
-    .tx_q1(tx_data_im),
+    .tx_i1(12'h000), 
+    .tx_q1(12'h000),
     
     // Catalina interface   
     .rx_clk(codec_data_clk_p), 

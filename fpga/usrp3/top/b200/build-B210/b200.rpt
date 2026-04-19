@@ -6,24 +6,24 @@ Selected Device : 6slx150fgg484-3
 
 
 Slice Logic Utilization: 
- Number of Slice Registers:           34158  out of  184304    18%  
- Number of Slice LUTs:                37238  out of  92152    40%  
-    Number used as Logic:             31138  out of  92152    33%  
+ Number of Slice Registers:           34198  out of  184304    18%  
+ Number of Slice LUTs:                37271  out of  92152    40%  
+    Number used as Logic:             31171  out of  92152    33%  
     Number used as Memory:             6100  out of  21680    28%  
        Number used as RAM:             1560
        Number used as SRL:             4540
 
 Slice Logic Distribution: 
- Number of LUT Flip Flop pairs used:  50491
-   Number with an unused Flip Flop:   16333  out of  50491    32%  
-   Number with an unused LUT:         13253  out of  50491    26%  
-   Number of fully used LUT-FF pairs: 20905  out of  50491    41%  
-   Number of unique control sets:       807
+ Number of LUT Flip Flop pairs used:  50536
+   Number with an unused Flip Flop:   16338  out of  50536    32%  
+   Number with an unused LUT:         13265  out of  50536    26%  
+   Number of fully used LUT-FF pairs: 20933  out of  50536    41%  
+   Number of unique control sets:       810
 
 IO Utilization: 
  Number of IOs:                         180
- Number of bonded IOBs:                 149  out of    338    44%  
-    IOB Flip Flops/Latches:             170
+ Number of bonded IOBs:                 152  out of    338    44%  
+    IOB Flip Flops/Latches:             173
 
 Specific Feature Utilization:
  Number of Block RAM/FIFO:              190  out of    268    70%  
