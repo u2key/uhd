@@ -266,6 +266,12 @@ module b200
   assign tx_data_re = tx_wave_re;
   assign tx_data_im = tx_wave_im;
 
+  wire        rx_radio_clk;
+  reg         rx_wave_valid;
+  always @(negedge rx_radio_clk) begin
+    rx_wave_valid <= rx_frame_p;
+  end
+
   reg         rx_wave_clock;
   assign debug[15] = rx_wave_clock;
   reg         rx_wave_frame;
@@ -309,7 +315,7 @@ module b200
       rx_wave_im    <= 12'h000;
       rx_wave       <= 12'h000;
       rx_wave_frame <= 1'b0;
-    end else if (rx_data_re == 12'h000 && rx_data_im == 12'h000) begin
+    end else if (rx_wave_valid == 1'b0) begin
       rx_wave_re    <= 12'h000;
       rx_wave_im    <= 12'h000;
       rx_wave       <= 12'h000;
@@ -333,15 +339,17 @@ module b200
     
     // Baseband sample interface
     .radio_clk(radio_clk),
-    .rx_i0(), 
-    .rx_q0(), 
-    .rx_i1(rx_data_re), 
-    .rx_q1(rx_data_im),
+    .rx_i0(rx_data_re), 
+    .rx_q0(rx_data_im), 
+    .rx_i1(), 
+    .rx_q1(),
     .tx_i0(tx_data_re), 
     .tx_q0(tx_data_im), 
     .tx_i1(12'h000), 
     .tx_q1(12'h000),
     
+    .siso_clk_out(rx_radio_clk),
+
     // Catalina interface   
     .rx_clk(codec_data_clk_p), 
     .rx_frame(rx_frame_p),      
