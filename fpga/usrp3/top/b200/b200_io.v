@@ -31,6 +31,7 @@ module b200_io
     input  [11:0] tx_q1,
 
     output        siso_clk_out,
+    output        strobe,
 
     // Catalina interface
     input         rx_clk,
@@ -180,7 +181,7 @@ module b200_io
   //------------------------------------------------------------------
   // RX Data Bus - In bank3 both LT and LB
   //------------------------------------------------------------------
-  wire [11:0] rx_i,rx_q;
+  wire [11:0] rx_i, rx_q;
 
   // Bit0 LB
   IDDR2 #(
@@ -432,7 +433,6 @@ module b200_io
   assign rx_i1 = (mimo_sync) ? rx_i1_siso_neg : rx_i1_siso_pos;
   assign rx_q1 = (mimo_sync) ? rx_q1_siso_neg : rx_q1_siso_pos;
 
-
   //------------------------------------------------------------------
   // TX Data Bus - In bank3 LB
   //------------------------------------------------------------------
@@ -501,14 +501,14 @@ module b200_io
   reg        find_radio_clk_phase = 1'b0;
   reg        find_radio_clk_phase_del;
 
-
   always @(posedge radio_clk) begin
-     find_radio_clk_phase <= ~find_radio_clk_phase;
+    find_radio_clk_phase <= ~find_radio_clk_phase;
   end
   always @(negedge radio_clk) begin
     find_radio_clk_phase_del <= find_radio_clk_phase;
   end
   assign tx_strobe = mimo_sync ? (find_radio_clk_phase_del ^ find_radio_clk_phase) : 1'b1;
+  assign strobe = tx_strobe;
 
   always @(posedge siso_clk) begin
     tx_strobe_del <= tx_strobe;
