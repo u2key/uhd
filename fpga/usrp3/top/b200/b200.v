@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //
 
-
 /***********************************************************
  * B200 Module Declaration
  **********************************************************/
@@ -95,9 +94,8 @@ module b200
     // Only present on Rev6 and later boards...these pins unused on Rev5 and earlier.
     // NOTE: These pins are allocated from complimentry pairs and could potentially be used
     // as differential style I/O.
-`ifdef TARGET_B210
     inout  [ 7:0] fp_gpio,
-`endif
+
     // Misc Hardware Control
     output        ref_sel,
     input         pll_lock,
@@ -132,15 +130,58 @@ module b200
   // generate clocks from always on codec main clk
   ///////////////////////////////////////////////////////////////////////
   wire bus_clk, gpif_clk, radio_clk;
+  wire rx_data_clock;
   wire locked;
   b200_clk_gen gen_clks (
     .CLK_IN1_40_P(codec_main_clk_p), 
     .CLK_IN1_40_N(codec_main_clk_n),
-    .CLK_OUT1_40_int(), 
+    .CLK_OUT1_40_int(rx_data_clock), 
     .CLK_OUT2_100_gpif(gpif_clk), 
     .CLK_OUT3_100_bus(),
     .RESET(reset_global), 
     .LOCKED(locked)
+  );
+
+  // Generate 30MHz clock from the 40MHz rx_data_clock
+  wire rx_data_clock_30;
+  wire dcm30_clkfx;
+  wire dcm30_locked;
+  DCM_SP #(
+    .CLKDV_DIVIDE(2.0),
+    .CLKFX_DIVIDE(4),
+    .CLKFX_MULTIPLY(3),
+    .CLKIN_DIVIDE_BY_2("FALSE"),
+    .CLKIN_PERIOD(25.0),
+    .CLKOUT_PHASE_SHIFT("NONE"),
+    .CLK_FEEDBACK("NONE"),
+    .DESKEW_ADJUST("SYSTEM_SYNCHRONOUS"),
+    .PHASE_SHIFT(0),
+    .STARTUP_WAIT("FALSE")
+  ) dcm_sp_30 (
+    .CLKIN(rx_data_clock),
+    .CLKFB(1'b0),
+    .CLK0(),
+    .CLK90(),
+    .CLK180(),
+    .CLK270(),
+    .CLK2X(),
+    .CLK2X180(),
+    .CLKFX(dcm30_clkfx),
+    .CLKFX180(),
+    .CLKDV(),
+    .PSCLK(1'b0),
+    .PSEN(1'b0),
+    .PSINCDEC(1'b0),
+    .PSDONE(),
+    .LOCKED(dcm30_locked),
+    .STATUS(),
+    .RST(reset_global),
+    .DSSEN(1'b0)
+  );
+
+  BUFG bufg_30 (
+    .I(dcm30_clkfx),
+    .O(rx_data_clock_30)
   );
 
   // Bus Clock and GPIF Clock both same 100MHz clock.
@@ -163,7 +204,7 @@ module b200
   // drive output clocks
   ///////////////////////////////////////////////////////////////////////
   wire [1:0] debug_clk_int;
-  assign debug_clk[1:0] = 2'b0;
+  // assign debug_clk[1:0] = 2'b0; // Removed to allow loopback logic to drive debug_clk
   S6CLK2PIN S6CLK2PIN_gpif (
     .I(gpif_clk), 
     .O(IFCLK)
@@ -189,149 +230,155 @@ module b200
     .reset_out(radio_rst)
   );
 
-  ///////////////////////////////////////////////////////////////////////
-  // I/O
-  ///////////////////////////////////////////////////////////////////////
-  wire [31:0] tx_data0, tx_data1;
-  wire [31:0] rx_data0 = {tx_data0[31:20], 4'h0, tx_data0[15:4], 4'h0};
-  wire [31:0] rx_data1 = {tx_data1[31:20], 4'h0, tx_data1[15:4], 4'h0};
-  
-  wire        tx_wave_reset = reset_global;
-  wire        tx_wave_clock = debug[31];
-  wire        tx_wave_frame = debug[30];
-  wire [11:0] tx_wave;
-  assign tx_wave[ 0] = debug[29];
-  assign tx_wave[ 1] = debug[28];
-  assign tx_wave[ 2] = debug[27];
-  assign tx_wave[ 3] = debug[26];
-  assign tx_wave[ 4] = debug[25];
-  assign tx_wave[ 5] = debug[24];
-  assign tx_wave[ 6] = debug[23];
-  assign tx_wave[ 7] = debug[22];
-  assign tx_wave[ 8] = debug[21];
-  assign tx_wave[ 9] = debug[20];
-  assign tx_wave[10] = debug[19];
-  assign tx_wave[11] = debug[18];
-  assign debug[31] = 1'bz;
-  assign debug[30] = 1'bz;
-  assign debug[29] = 1'bz;
-  assign debug[28] = 1'bz;
-  assign debug[27] = 1'bz;
-  assign debug[26] = 1'bz;
-  assign debug[25] = 1'bz;
-  assign debug[24] = 1'bz;
-  assign debug[23] = 1'bz;
-  assign debug[22] = 1'bz;
-  assign debug[21] = 1'bz;
-  assign debug[20] = 1'bz;
-  assign debug[19] = 1'bz;
-  assign debug[18] = 1'bz;
-  assign debug[17] = 1'b0;
-  assign debug[16] = 1'b0;
-  reg         tx_wave_clock_sync0, tx_wave_clock_sync1, tx_wave_clock_sync2;
-  reg         tx_wave_frame_sync0, tx_wave_frame_sync1, tx_wave_frame_sync2;
-  reg         tx_wave_sync0, tx_wave_sync1, tx_wave_sync2;
-  wire        tx_wave_clock_edge = (tx_wave_clock_sync2 == 1'b0 && tx_wave_clock_sync1 == 1'b1);
-  reg         tx_wave_frame_r0, tx_wave_frame_r1;
-  reg  [11:0] tx_wave_r0, tx_wave_r1, tx_wave_re, tx_wave_im;
-  wire [11:0] tx_data_re, tx_data_im;
-  always @(posedge bus_clk) begin
-    tx_wave_clock_sync0 <= tx_wave_clock;
-    tx_wave_clock_sync1 <= tx_wave_clock_sync0;
-    tx_wave_clock_sync2 <= tx_wave_clock_sync1;
-    tx_wave_frame_sync0 <= tx_wave_frame;
-    tx_wave_frame_sync1 <= tx_wave_frame_sync0;
-    tx_wave_frame_sync2 <= tx_wave_frame_sync1;
-    tx_wave_sync0 <= tx_wave;
-    tx_wave_sync1 <= tx_wave_sync0;
-    tx_wave_sync2 <= tx_wave_sync1;
-    if (tx_wave_reset == 1'b1) begin
-      tx_wave_frame_r0 <= 1'b0;
-      tx_wave_frame_r1 <= 1'b0;
-      tx_wave_r0 <= 12'h000;
-      tx_wave_r1 <= 12'h000;
-      tx_wave_re <= 12'h000;
-      tx_wave_im <= 12'h000;
-    end else if (tx_wave_clock_edge == 1'b1) begin
-      tx_wave_frame_r0 <= tx_wave_frame_sync2;
-      tx_wave_frame_r1 <= tx_wave_frame_r0;
-      tx_wave_r0 <= tx_wave_sync2;
-      tx_wave_r1 <= tx_wave_r0;
-      if (tx_wave_frame_r1 == 1'b0 && tx_wave_frame_r0 == 1'b1) begin
-        tx_wave_re <= tx_wave_r1;
-        tx_wave_im <= tx_wave_r0;
-      end
-    end
-  end
-  assign tx_data_re = tx_wave_re;
-  assign tx_data_im = tx_wave_im;
+  wire        tx_data_clock;
+  wire        tx_data_frame;
+  wire        tx_data_valid;
+  wire [11:0] tx_data;
+  wire        btn_reset;
+  assign tx_data_clock = debug_clk[0];
+  assign tx_data_frame = debug[31];
+  assign tx_data_valid = debug[30];
+  assign tx_data[11]   = debug[29];
+  assign tx_data[10]   = debug[28];
+  assign tx_data[ 9]   = debug[27];
+  assign tx_data[ 8]   = debug[26];
+  assign tx_data[ 7]   = debug[25];
+  assign tx_data[ 6]   = debug[24];
+  assign tx_data[ 5]   = debug[23];
+  assign tx_data[ 4]   = debug[22];
+  assign tx_data[ 3]   = debug[21];
+  assign tx_data[ 2]   = debug[20];
+  assign tx_data[ 1]   = debug[19];
+  assign tx_data[ 0]   = debug[18];
+  assign btn_reset     = debug[17];
+  assign debug[16]     = 1'b0;
 
-  wire        rx_radio_clk;
-  reg         rx_wave_valid;
-  always @(negedge rx_radio_clk) begin
-    rx_wave_valid <= rx_frame_p;
-  end
+  reg         rx_data_frame;
+  reg         rx_data_valid;
+  reg  [11:0] rx_data;
+  S6CLK2PIN S6CLK2PIN_debug_clk1 (
+    .I(rx_data_clock_30), 
+    .O(debug_clk[1])
+  );
+  assign debug[15]    = rx_data_frame;
+  assign debug[14]    = rx_data_valid;
+  assign debug[13]    = rx_data[11];
+  assign debug[12]    = rx_data[10];
+  assign debug[11]    = rx_data[ 9];
+  assign debug[10]    = rx_data[ 8];
+  assign debug[ 9]    = rx_data[ 7];
+  assign debug[ 8]    = rx_data[ 6];
+  assign debug[ 7]    = rx_data[ 5];
+  assign debug[ 6]    = rx_data[ 4];
+  assign debug[ 5]    = rx_data[ 3];
+  assign debug[ 4]    = rx_data[ 2];
+  assign debug[ 3]    = rx_data[ 1];
+  assign debug[ 2]    = rx_data[ 0];
+  assign debug[ 1]    = 1'b0;
+  assign debug[ 0]    = 1'b0;
 
-  reg         rx_wave_clock;
-  assign debug[15] = rx_wave_clock;
-  reg         rx_wave_frame;
-  assign debug[14] = rx_wave_frame;
-  reg  [ 2:0] rx_wave_clock_count;
-  wire        rx_wave_reset = reset_global;
-  reg  [11:0] rx_wave, rx_wave_re, rx_wave_im;
-  assign debug[13] = rx_wave[ 0];
-  assign debug[12] = rx_wave[ 1];
-  assign debug[11] = rx_wave[ 2];
-  assign debug[10] = rx_wave[ 3];
-  assign debug[ 9] = rx_wave[ 4];
-  assign debug[ 8] = rx_wave[ 5];
-  assign debug[ 7] = rx_wave[ 6];
-  assign debug[ 6] = rx_wave[ 7];
-  assign debug[ 5] = rx_wave[ 8];
-  assign debug[ 4] = rx_wave[ 9];
-  assign debug[ 3] = rx_wave[10];
-  assign debug[ 2] = rx_wave[11];
-  assign debug[ 1] = 1'b0;
-  assign debug[ 0] = 1'b0;
-  wire [11:0] rx_data_re, rx_data_im;
+  reg         tx_data_clock_r0, tx_data_clock_r1, tx_data_clock_r2;
+  reg         tx_data_frame_r0, tx_data_frame_r1;
+  reg         tx_data_valid_r0, tx_data_valid_r1, tx_data_valid_r2, tx_data_valid_safe;
+  reg  [11:0] tx_data_r0, tx_data_r1, tx_data_re_r2, tx_data_im_r2, tx_data_re_safe, tx_data_im_safe;
   always @(posedge bus_clk) begin
-    if (rx_wave_reset == 1'b1) begin
-      rx_wave_clock_count <= 3'b000;
-      rx_wave_clock <= 1'b0;
+    if (btn_reset == 1'b1) begin
+      tx_data_clock_r0   <= 1'b0;
+      tx_data_clock_r1   <= 1'b0;
+      tx_data_clock_r2   <= 1'b0;
+      tx_data_frame_r0   <= 1'b0;
+      tx_data_frame_r1   <= 1'b0;
+      tx_data_valid_r0   <= 1'b0;
+      tx_data_valid_r1   <= 1'b0;
+      tx_data_valid_r2   <= 1'b0;
+      tx_data_valid_safe <= 1'b0;
+      tx_data_r0         <= 12'b000000000000;
+      tx_data_r1         <= 12'b000000000000;
+      tx_data_re_r2      <= 12'b000000000000;
+      tx_data_im_r2      <= 12'b000000000000;
+      tx_data_re_safe    <= 12'b000000000000;
+      tx_data_im_safe    <= 12'b000000000000;
     end else begin
-      rx_wave_clock_count <= rx_wave_clock_count + 1'b1;
-      if (rx_wave_clock_count == 3'b000) begin
-        rx_wave_clock <= 1'b0;
-      end else if (rx_wave_clock_count == 3'b010) begin
-        rx_wave_clock <= 1'b1;
-      end else if (rx_wave_clock_count == 3'b100) begin
-        rx_wave_clock <= 1'b0;
-      end else if (rx_wave_clock_count == 3'b110) begin
-        rx_wave_clock <= 1'b1;
+      tx_data_clock_r0 <= tx_data_clock;
+      tx_data_clock_r1 <= tx_data_clock_r0;
+      tx_data_clock_r2 <= tx_data_clock_r1;
+      tx_data_frame_r0 <= tx_data_frame;
+      tx_data_frame_r1 <= tx_data_frame_r0;
+      tx_data_valid_r0 <= tx_data_valid;
+      tx_data_valid_r1 <= tx_data_valid_r0;
+      tx_data_r0       <= tx_data;
+      tx_data_r1       <= tx_data_r0;
+      if (tx_data_clock_r2 == 1'b0 && tx_data_clock_r1 == 1'b1) begin
+        tx_data_valid_r2 <= tx_data_valid_r1;
+        if (tx_data_frame_r1 == 1'b1) begin
+          tx_data_re_r2 <= tx_data_r1;
+          tx_data_valid_safe <= tx_data_valid_r2;
+          tx_data_re_safe    <= tx_data_re_r2;
+          tx_data_im_safe    <= tx_data_im_r2;
+        end else begin
+          tx_data_im_r2 <= tx_data_r1;
+        end
       end
-    end
-    if (rx_wave_reset == 1'b1) begin
-      rx_wave_re    <= 12'h000;
-      rx_wave_im    <= 12'h000;
-      rx_wave       <= 12'h000;
-      rx_wave_frame <= 1'b0;
-    end else if (rx_wave_valid == 1'b0) begin
-      rx_wave_re    <= 12'h000;
-      rx_wave_im    <= 12'h000;
-      rx_wave       <= 12'h000;
-      rx_wave_frame <= 1'b0;
-    end else if (rx_wave_clock_count == 3'b000) begin
-      rx_wave_re    <= rx_data_re;
-      rx_wave_im    <= rx_data_im;
-      rx_wave       <= rx_data_re;
-      rx_wave_frame <= 1'b0;
-    end else if (rx_wave_clock_count == 3'b100) begin
-      rx_wave       <= rx_wave_im;
-      rx_wave_frame <= 1'b1;
     end
   end
 
-  wire mimo;
+  wire [11:0] tx_i0, tx_q0, tx_i1, tx_q1;
+  assign tx_i0 = tx_data_re_safe;
+  assign tx_q0 = tx_data_im_safe;
+  assign tx_i1 = 12'h000;
+  assign tx_q1 = 12'h000;
+
+  wire [11:0] rx_i0, rx_q0, rx_i1, rx_q1;
+
+  // -------------------------------------------------------------
+  // Real-World Packet Envelope Detector with Hold Timer
+  // -------------------------------------------------------------
+  wire [11:0] abs_rx_i0 = rx_i0[11] ? -rx_i0 : rx_i0;
+  wire [11:0] abs_rx_q0 = rx_q0[11] ? -rx_q0 : rx_q0;
+  wire [12:0] rx_mag    = abs_rx_i0 + abs_rx_q0;
+  
+  // Threshold to distinguish signal from background noise (adjust as needed)
+  wire threshold_exceeded = (rx_mag > 13'h000A); 
+  
+  // Hold timer to bridge across valid zeros in the payload
+  reg [15:0] hold_timer = 16'd0;
+  reg  [11:0] rx_data_re, rx_data_im;
+  
+  always @(negedge rx_data_clock_30) begin
+    if (btn_reset == 1'b1) begin
+      rx_data_re    <= 12'h000;
+      rx_data_im    <= 12'h000;
+      rx_data       <= 12'h000;
+      rx_data_frame <= 1'b0;
+      rx_data_valid <= 1'b0;
+      hold_timer    <= 16'd0;
+    end else begin
+      if (rx_data_frame == 1'b0) begin
+        rx_data_re    <= rx_i0;
+        rx_data_im    <= rx_q0;
+        rx_data       <= rx_i0;
+        rx_data_frame <= 1'b1;
+      end else begin
+        rx_data       <= rx_data_im;
+        rx_data_frame <= 1'b0;
+      end
+      // Packet Envelope Logic
+      if (threshold_exceeded) begin
+        // Energy detected! Assert valid and reset timer
+        rx_data_valid <= 1'b1;
+        hold_timer <= 16'd400; // Hold for 400 samples (covers long zero-gaps)
+      end else if (hold_timer > 0) begin
+        // No energy, but timer is running. Keep valid High and countdown!
+        rx_data_valid <= 1'b1;
+        hold_timer <= hold_timer - 1'b1;
+      end else begin
+        // No energy and timer expired. Packet is definitely over.
+        rx_data_valid <= 1'b0;
+      end
+    end
+  end
+
+  wire mimo = 1'b0;
    
   b200_io b200_io_i0 (
     .reset(reset),
@@ -339,16 +386,17 @@ module b200
     
     // Baseband sample interface
     .radio_clk(radio_clk),
-    .rx_i0(rx_data_re), 
-    .rx_q0(rx_data_im), 
-    .rx_i1(), 
-    .rx_q1(),
-    .tx_i0(tx_data_re), 
-    .tx_q0(tx_data_im), 
-    .tx_i1(12'h000), 
-    .tx_q1(12'h000),
+    .rx_i0(rx_i0), 
+    .rx_q0(rx_q0), 
+    .rx_i1(rx_i1), 
+    .rx_q1(rx_q1),
+    .tx_i0(tx_i0), 
+    .tx_q0(tx_q0), 
+    .tx_i1(tx_i1), 
+    .tx_q1(tx_q1),
     
-    .siso_clk_out(rx_radio_clk),
+    .siso_clk_out(),
+    .strobe(),
 
     // Catalina interface   
     .rx_clk(codec_data_clk_p), 
@@ -411,8 +459,9 @@ module b200
   always @(posedge bus_clk) begin
     misc_outs_r <= misc_outs; // register misc ios to ease routing to flop
   end
+  wire mimo_dummy;
   wire codec_arst;
-  assign {swap_atr_n, tx_bandsel_a, tx_bandsel_b, rx_bandsel_a, rx_bandsel_b, rx_bandsel_c, codec_arst, mimo, ref_sel } = misc_outs_r[8:0];
+  assign {swap_atr_n, tx_bandsel_a, tx_bandsel_b, rx_bandsel_a, rx_bandsel_b, rx_bandsel_c, codec_arst, mimo_dummy, ref_sel } = misc_outs_r[8:0];
   assign codec_ctrl_in = 4'b1;
   assign codec_en_agc  = 1'b1;
   assign codec_txrx    = 1'b1;
@@ -423,8 +472,11 @@ module b200
   ///////////////////////////////////////////////////////////////////////
   // b200 core
   ///////////////////////////////////////////////////////////////////////
-  wire [9:0] fp_gpio_in, fp_gpio_out, fp_gpio_ddr;
-
+  wire [ 9:0] fp_gpio_in, fp_gpio_out, fp_gpio_ddr;
+  wire [31:0] tx_data0, tx_data1;
+  wire [31:0] rx_data0, rx_data1;
+  assign rx_data0 = tx_data0;
+  assign rx_data1 = tx_data1;
   b200_core #(
     .EXTRA_BUFF_SIZE(12)
   ) b200_core (

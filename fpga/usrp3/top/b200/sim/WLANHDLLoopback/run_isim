@@ -871,10 +871,19 @@ vlogcomp -work work --sourcelibext .v \
   --sourcelibdir ../../../../lib/dsp \
   --sourcelibdir ../../../../lib/wishbone \
   --sourcelibdir ../../../../lib/gpif2 \
-	--sourcelibdir ../../../../lib/io \
+  --sourcelibdir ../../../../lib/io \
+  --sourcelibdir ../../../../lib/control_200 \
+  --sourcelibdir ../../../../lib/radio_200 \
+  --sourcelibdir ../../../../lib/fifo_200 \
+  --sourcelibdir ../../../../lib/radio \
+  --sourcelibdir ../../../../lib/vita_200 \
+  --sourcelibdir ../../coregen_dsp \
+  ../../../../lib/control/ram_2port.v \
+  ../../b200_core.v \
+  ../../b200.v \
   b210_tb.v
 
-fuse work.b210_tb work.glbl -L unisims_ver -L xilinxcorelib_ver -o b210_tb.run
+fuse work.b210_tb work.glbl -L unisims_ver -L unimacro_ver -L xilinxcorelib_ver -o b210_tb.run
 
-# run the simulation scrip
-./b210_tb.run -gui
+# run the simulation script
+./b210_tb.run -tclbatch b210_tb.tcl
