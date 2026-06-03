@@ -145,17 +145,23 @@ module b210_tb ();
   initial begin
     // ---- VCD出力設定を追加 ----
     $dumpfile("b210_simulation.vcd"); // 保存されるファイル名
-    $dumpvars(0, b210_tb);            // b210_tb 以下のすべての階層の信号をダンプ
-    $dumpvars(0, b210_tb.b200_0);     // b200_0  以下のすべての階層の信号をダンプ
-    $dumpvars(0, b210_tb.loopback);   // loopback 以下のすべての階層の信号をダンプ
+    $dumpvars(0, b210_tb);            // b210_tb 以下のすべての階層 of signals
+    $dumpvars(0, b210_tb.b200_0);     // b200_0  以下のすべての階層 of signals
+    $dumpvars(0, b210_tb.loopback);   // loopback 以下のすべての階層 of signals
     $dumpvars(0, glbl);               // グローバル信号をダンプ
     // --------------------------
     #(1000000) btn_reset <= 1; btn_tx_start <= 0; btn_rx_start <= 0;
     #(1000000) btn_reset <= 0; btn_tx_start <= 0; btn_rx_start <= 0;
+    
+    // Wait for the FPGA internal clocks to be fully ready (takes ~655 us)
+    @(posedge b200_0.clocks_ready);
+    
     #(1000000) btn_reset <= 0; btn_tx_start <= 0; btn_rx_start <= 1;
     #(1000000) btn_reset <= 0; btn_tx_start <= 0; btn_rx_start <= 0;
     #(1000000) btn_reset <= 0; btn_tx_start <= 1; btn_rx_start <= 0;
     #(1000000) btn_reset <= 0; btn_tx_start <= 0; btn_rx_start <= 0;
+    
+    // Run for another 400 us (covers the packet transmission)
     #(2000000000)
     #(2000000000)
     #(2000000000)

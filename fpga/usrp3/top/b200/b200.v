@@ -146,6 +146,17 @@ module b200
   wire rx_data_clock_30;
   wire dcm30_clkfx;
   wire dcm30_locked;
+
+  reg [3:0] dcm30_rst_reg = 4'b1111;
+  always @(posedge rx_data_clock or posedge reset_global) begin
+    if (reset_global) begin
+      dcm30_rst_reg <= 4'b1111;
+    end else begin
+      dcm30_rst_reg <= {dcm30_rst_reg[2:0], 1'b0};
+    end
+  end
+  wire dcm30_rst = dcm30_rst_reg[3];
+
   DCM_SP #(
     .CLKDV_DIVIDE(2.0),
     .CLKFX_DIVIDE(4),
@@ -175,7 +186,7 @@ module b200
     .PSDONE(),
     .LOCKED(dcm30_locked),
     .STATUS(),
-    .RST(reset_global),
+    .RST(dcm30_rst),
     .DSSEN(1'b0)
   );
 
