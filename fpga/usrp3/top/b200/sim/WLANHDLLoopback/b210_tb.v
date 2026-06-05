@@ -144,7 +144,7 @@ module b210_tb ();
 
   initial begin
     // ---- VCD出力設定を追加 ----
-    $dumpfile("b210_simulation.vcd"); // 保存されるファイル名
+    $dumpfile("b210_tb.vcd"); // 保存されるファイル名
     $dumpvars(0, b210_tb);            // b210_tb 以下のすべての階層 of signals
     $dumpvars(0, b210_tb.b200_0);     // b200_0  以下のすべての階層 of signals
     $dumpvars(0, b210_tb.loopback);   // loopback 以下のすべての階層 of signals
