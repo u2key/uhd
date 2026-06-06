@@ -262,7 +262,7 @@ module b200
   assign tx_data[ 1]   = debug[19];
   assign tx_data[ 0]   = debug[18];
   assign btn_reset     = debug[17];
-  assign debug[16]     = 1'b0;
+  assign debug[16]     = 1'bz;
 
   reg         rx_data_frame;
   reg         rx_data_valid;
@@ -285,8 +285,8 @@ module b200
   assign debug[ 4]    = rx_data[ 2];
   assign debug[ 3]    = rx_data[ 1];
   assign debug[ 2]    = rx_data[ 0];
-  assign debug[ 1]    = 1'b0;
-  assign debug[ 0]    = 1'b0;
+  assign debug[ 1]    = 1'bz;
+  assign debug[ 0]    = 1'bz;
 
   reg         tx_data_clock_r0, tx_data_clock_r1, tx_data_clock_r2;
   reg         tx_data_frame_r0, tx_data_frame_r1;
