@@ -1,1 +1,2 @@
 *.sh text eol=lf
+fpga/usrp3/top/b200/sim/WLANHDLLoopback/b210_simulation.vcd filter=lfs diff=lfs merge=lfs -text
