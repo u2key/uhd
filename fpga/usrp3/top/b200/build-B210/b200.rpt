@@ -22,7 +22,7 @@ Slice Logic Distribution:
 
 IO Utilization: 
  Number of IOs:                         180
- Number of bonded IOBs:                 161  out of    338    47%  
+ Number of bonded IOBs:                 158  out of    338    46%  
     IOB Flip Flops/Latches:             184
 
 Specific Feature Utilization:
