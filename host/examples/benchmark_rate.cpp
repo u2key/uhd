@@ -361,8 +361,8 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         ("tx_subdev", po::value<std::string>(&tx_subdev), "specify the device subdev for TX")
         ("rx_stream_args", po::value<std::string>(&rx_stream_args)->default_value(""), "stream args for RX streamer")
         ("tx_stream_args", po::value<std::string>(&tx_stream_args)->default_value(""), "stream args for TX streamer")
-        ("rx_rate", po::value<double>(&rx_rate), "specify to perform a RX rate test (sps)")
-        ("tx_rate", po::value<double>(&tx_rate), "specify to perform a TX rate test (sps)")
+        ("rx_rate", po::value<double>(&rx_rate)->default_value(15e6), "specify to perform a RX rate test (sps)")
+        ("tx_rate", po::value<double>(&tx_rate)->default_value(15e6), "specify to perform a TX rate test (sps)")
         ("rx_spp", po::value<size_t>(&rx_spp), "samples/packet value for RX")
         ("tx_spp", po::value<size_t>(&tx_spp), "samples/packet value for TX")
         ("rx_spb", po::value<size_t>(&rx_spb), "samples/buffer value for RX")
@@ -399,8 +399,8 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
     po::notify(vm);
 
     // print the help message
-    if (vm.count("help") or (vm.count("rx_rate") + vm.count("tx_rate")) == 0) {
-        std::cout << boost::format("UHD Benchmark Rate %s") % desc << std::endl;
+    if (vm.count("help")) {
+        std::cout << boost::format("Usage: %s [options]") % argv[0] << std::endl;
         std::cout << "    Specify --rx_rate for a receive-only test.\n"
                      "    Specify --tx_rate for a transmit-only test.\n"
                      "    Specify both options for a full-duplex test.\n"
