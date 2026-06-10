@@ -268,7 +268,7 @@ module b200
   reg         rx_data_valid;
   reg  [11:0] rx_data;
   S6CLK2PIN S6CLK2PIN_debug_clk1 (
-    .I(rx_data_clock_30), 
+    .I(radio_clk), 
     .O(debug_clk[1])
   );
   assign debug[15]    = rx_data_frame;
@@ -355,7 +355,7 @@ module b200
   reg [15:0] hold_timer = 16'd0;
   reg  [11:0] rx_data_re, rx_data_im;
   
-  always @(negedge rx_data_clock_30) begin
+  always @(negedge radio_clk) begin
     if (btn_reset == 1'b1) begin
       rx_data_re    <= 12'h000;
       rx_data_im    <= 12'h000;
