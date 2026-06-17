@@ -348,8 +348,9 @@ module b200
   wire [11:0] abs_rx_q0 = rx_q0[11] ? -rx_q0 : rx_q0;
   wire [12:0] rx_mag    = abs_rx_i0 + abs_rx_q0;
   
-  // Threshold to distinguish signal from background noise (adjust as needed)
-  wire threshold_exceeded = (rx_mag > 13'h000A); 
+  // Threshold to distinguish signal from background noise
+  // AD9361 noise floor is typically ~30-50 LSB; set well above that
+  wire threshold_exceeded = (rx_mag > 13'h00C8); // 200 decimal
   
   // Hold timer to bridge across valid zeros in the payload
   reg [15:0] hold_timer = 16'd0;
@@ -377,7 +378,7 @@ module b200
       if (threshold_exceeded) begin
         // Energy detected! Assert valid and reset timer
         rx_data_valid <= 1'b1;
-        hold_timer <= 16'd400; // Hold for 400 samples (covers long zero-gaps)
+        hold_timer <= 16'd100; // Hold for 100 samples
       end else if (hold_timer > 0) begin
         // No energy, but timer is running. Keep valid High and countdown!
         rx_data_valid <= 1'b1;
