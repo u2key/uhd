@@ -494,6 +494,11 @@ module b200
   //   - tx0/tx1: outputs ignored (no USB data goes to DAC)
   ///////////////////////////////////////////////////////////////////////
   wire [ 9:0] fp_gpio_in, fp_gpio_out, fp_gpio_ddr;
+  wire [31:0] tx_data0, tx_data1;
+  wire [31:0] rx_data0, rx_data1;
+  assign rx_data0 = tx_data0;
+  assign rx_data1 = tx_data1;
+
   b200_core #(
     .EXTRA_BUFF_SIZE(12)
   ) b200_core (
@@ -504,8 +509,8 @@ module b200
     .ctrl_tdata(ctrl_tdata), .ctrl_tlast(ctrl_tlast),  .ctrl_tvalid(ctrl_tvalid), .ctrl_tready(ctrl_tready),
     .resp_tdata(resp_tdata), .resp_tlast(resp_tlast),  .resp_tvalid(resp_tvalid), .resp_tready(resp_tready),
     .radio_clk(radio_clk), .radio_rst(radio_rst),
-    .rx0(32'h00000000), .rx1(32'h00000000),
-    .tx0(), .tx1(),
+    .rx0(rx_data0), .rx1(rx_data1),
+    .tx0(tx_data0), .tx1(tx_data1),
     .fe0_gpio_out(radio0_gpio), .fe1_gpio_out(radio1_gpio),
     .fp_gpio_in(fp_gpio_in), .fp_gpio_out(fp_gpio_out), .fp_gpio_ddr(fp_gpio_ddr),
     .pps_int(PPS_IN_INT), .pps_ext(PPS_IN_EXT),
