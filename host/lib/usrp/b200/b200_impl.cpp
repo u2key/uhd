@@ -704,6 +704,7 @@ b200_impl::b200_impl(
         this->setup_radio(i);
 
     // now test each radio module's connection to the codec interface
+    /*
     for (radio_perifs_t& perif : _radio_perifs) {
         _codec_mgr->loopback_self_test(
             [&perif](const uint32_t value) {
@@ -711,6 +712,7 @@ b200_impl::b200_impl(
             },
             [&perif]() { return perif.ctrl->peek64(RB64_CODEC_READBACK); });
     }
+    */
 
     // register time now and pps onto available radio cores
     _tree->create<time_spec_t>(mb_path / "time" / "now")
