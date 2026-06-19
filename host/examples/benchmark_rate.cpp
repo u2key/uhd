@@ -17,6 +17,7 @@
 #include <atomic>
 #include <chrono>
 #include <complex>
+#include <csignal> // ★ Ctrl+Cハンドラ用に新規追加
 #include <cstdlib>
 #include <iostream>
 #include <thread>
@@ -43,6 +44,13 @@ std::atomic_ullong num_seqrx_errors{0}; // "D"s
 std::atomic_ullong num_late_commands{0};
 std::atomic_ullong num_timeouts_rx{0};
 std::atomic_ullong num_timeouts_tx{0};
+
+// ★ Ctrl+Cを検知するためのグローバル停止フラグとハンドラ
+std::atomic<bool> stop_signal_called{false};
+void sig_int_handler(int)
+{
+    stop_signal_called = true;
+}
 
 inline auto time_delta(const start_time_type& ref_time)
 {
@@ -242,11 +250,6 @@ void benchmark_tx_rate(uhd::usrp::multi_usrp::sptr usrp,
     md.time_spec     = usrp->get_time_now() + uhd::time_spec_t(tx_delay);
 
     // Calculate timeout time
-    // The timeout time cannot be reduced after the first packet as is done for
-    // TX because the delay will only happen after the TX buffers in the FPGA
-    // are full and that is dependent on several factors such as the device,
-    // FPGA configuration, and device arguments.  The extra 100ms is to account
-    // for overhead of the send() call (enough).
     const double burst_pkt_time = std::max<double>(0.1, (2.0 * spb / tx_rate));
     double timeout              = burst_pkt_time + tx_delay;
 
@@ -331,6 +334,9 @@ void benchmark_tx_rate_async_helper(uhd::tx_streamer::sptr tx_stream,
  **********************************************************************/
 int UHD_SAFE_MAIN(int argc, char* argv[])
 {
+    // ★ シグナルハンドラを登録
+    std::signal(SIGINT, &sig_int_handler);
+
     // variables to be set by po
     std::string args;
     std::string rx_subdev, tx_subdev;
@@ -386,8 +392,6 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
          "Number of dropped packets (D) which will declare the benchmark a failure.")
         ("seq-threshold", po::value<size_t>(&seq_threshold),
          "Number of dropped packets (D) which will declare the benchmark a failure.")
-        // NOTE: tx_delay defaults to 0.25 while rx_delay defaults to 0.05 when left unspecified
-        // in multi-channel and multi-streamer configurations.
         ("tx_delay", po::value<double>(&tx_delay)->default_value(0.0), "delay before starting TX in seconds")
         ("rx_delay", po::value<double>(&rx_delay)->default_value(0.0), "delay before starting RX in seconds")
         ("priority", po::value<std::string>(&priority)->default_value("normal"), "thread priority (normal, high)")
@@ -593,12 +597,6 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
     // spawn the receive test thread
     if (vm.count("rx_rate")) {
         usrp->set_rx_rate(rx_rate);
-        // Set an appropriate rx_delay value (if needed) to be used as the time_spec for
-        // streaming.
-        // A time_spec is needed to time align multiple channels or if the user specifies
-        // a delay. Also delay start in case we are using multiple streamers to stream
-        // multi channel data to avoid management transaction contention between threads
-        // during setup.
         if ((rx_delay == 0.0 || vm.count("multi_streamer"))
             && rx_channel_nums.size() > 1) {
             adjusted_rx_delay = std::max(rx_delay, 0.05);
@@ -620,7 +618,6 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         if (vm.count("multi_streamer")) {
             for (size_t count = 0; count < rx_channel_nums.size(); count++) {
                 std::vector<size_t> this_streamer_channels{rx_channel_nums[count]};
-                // create a receive streamer
                 uhd::stream_args_t stream_args(rx_cpu, rx_otw);
                 stream_args.channels             = this_streamer_channels;
                 stream_args.args                 = uhd::device_addr_t(rx_stream_args);
@@ -641,7 +638,6 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
                 uhd::set_thread_name(rx_thread, "bmark_rx_strm" + std::to_string(count));
             }
         } else {
-            // create a receive streamer
             uhd::stream_args_t stream_args(rx_cpu, rx_otw);
             stream_args.channels             = rx_channel_nums;
             stream_args.args                 = uhd::device_addr_t(rx_stream_args);
@@ -666,12 +662,6 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
     // spawn the transmit test thread
     if (vm.count("tx_rate")) {
         usrp->set_tx_rate(tx_rate);
-        // Set an appropriate tx_delay value (if needed) to be used as the time_spec for
-        // streaming.
-        // A time_spec is needed to time align multiple channels or if the user specifies
-        // a delay. Also delay start in case we are using multiple streamers to stream
-        // multi channel data to avoid management transaction contention between threads
-        // during setup.
         if ((tx_delay == 0.0 || vm.count("multi_streamer"))
             && tx_channel_nums.size() > 1) {
             adjusted_tx_delay = std::max(tx_delay, 0.25);
@@ -680,8 +670,6 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         if (vm.count("multi_streamer")) {
             for (size_t count = 0; count < tx_channel_nums.size(); count++) {
                 std::vector<size_t> this_streamer_channels{tx_channel_nums[count]};
-
-                // create a transmit streamer
                 uhd::stream_args_t stream_args(tx_cpu, tx_otw);
                 stream_args.channels = this_streamer_channels;
                 stream_args.args     = uhd::device_addr_t(tx_stream_args);
@@ -725,7 +713,6 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
                     tx_async_thread, "bmark_tx_hlpr" + std::to_string(count));
             }
         } else {
-            // create a transmit streamer
             uhd::stream_args_t stream_args(tx_cpu, tx_otw);
             stream_args.channels = tx_channel_nums;
             stream_args.args     = uhd::device_addr_t(tx_stream_args);
@@ -769,21 +756,11 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         }
     }
 
-    // Sleep for the required duration (add any initial delay).
-    // If you are benchmarking Rx and Tx at the same time, Rx threads will run longer
-    // than specified duration if tx_delay > rx_delay because of the overly simplified
-    // logic below and vice versa.
-    if (vm.count("rx_rate") and vm.count("tx_rate")) {
-        duration += std::max(adjusted_rx_delay, adjusted_tx_delay);
-    } else if (vm.count("rx_rate")) {
-        duration += adjusted_rx_delay;
-    } else {
-        duration += adjusted_tx_delay;
+    // ★ [変更箇所] 従来の一定時間スリープを廃止し、Ctrl+C変更
+    std::cout << std::endl << "Streaming started. Press Ctrl+C to stop..." << std::endl;
+    while (not stop_signal_called) {
+        std::this_thread::sleep_for(100ms);
     }
-    const int64_t secs  = int64_t(duration);
-    const int64_t usecs = int64_t((duration - secs) * 1e6);
-    std::this_thread::sleep_for(
-        std::chrono::seconds(secs) + std::chrono::microseconds(usecs));
 
     // interrupt and join the threads
     burst_timer_elapsed = true;
