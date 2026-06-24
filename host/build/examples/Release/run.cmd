@@ -11,7 +11,7 @@ echo.
 REM benchmark_rate.exe を実行
 REM ※すでにbenchmark_rate.cpp側でデフォルト値を15e6に書き換えていますが、
 REM   明示的にパラメータを渡すことでより確実に動作させます。
-benchmark_rate.exe --tx_rate 15e6 --rx_rate 15e6
+benchmark_rate.exe --tx_rate 15e6 --rx_rate 15e6 --tx_gain 90 --rx_gain 70
 
 echo.
 echo =======================================================

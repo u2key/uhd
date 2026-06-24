@@ -355,6 +355,8 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
     bool rx_stream_now = false;
     std::string priority;
     bool elevate_priority = false;
+    double user_tx_gain = 10.0;
+    double user_rx_gain = 10.0;
 
     // setup the program options
     po::options_description desc("Allowed options");
@@ -396,6 +398,8 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         ("rx_delay", po::value<double>(&rx_delay)->default_value(0.0), "delay before starting RX in seconds")
         ("priority", po::value<std::string>(&priority)->default_value("normal"), "thread priority (normal, high)")
         ("multi_streamer", "Create a separate streamer per channel")
+        ("tx_gain", po::value<double>(&user_tx_gain)->default_value(10.0), "TX gain in dB")
+        ("rx_gain", po::value<double>(&user_rx_gain)->default_value(10.0), "RX gain in dB")
     ;
     // clang-format on
     po::variables_map vm;
@@ -583,8 +587,8 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         std::cout << boost::format("[%s] Setting RF frequency to %f MHz...") % NOW() % (target_freq / 1e6) << std::endl;
         
         // Added Gain and Antenna configuration
-        double tx_gain = 10.0;
-        double rx_gain = 10.0;
+        double tx_gain = user_tx_gain;
+        double rx_gain = user_rx_gain;
         std::string tx_ant = "TX/RX";
         std::string rx_ant = "RX2";
 
