@@ -583,8 +583,8 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         std::cout << boost::format("[%s] Setting RF frequency to %f MHz...") % NOW() % (target_freq / 1e6) << std::endl;
         
         // Added Gain and Antenna configuration
-        double tx_gain = 40.0;
-        double rx_gain = 30.0;
+        double tx_gain = 10.0;
+        double rx_gain = 10.0;
         std::string tx_ant = "TX/RX";
         std::string rx_ant = "RX2";
 
