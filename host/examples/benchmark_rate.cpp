@@ -17,7 +17,7 @@
 #include <atomic>
 #include <chrono>
 #include <complex>
-#include <csignal> // ★ Ctrl+Cハンドラ用に新規追加
+#include <csignal> // Added for Ctrl+C handler
 #include <cstdlib>
 #include <iostream>
 #include <thread>
@@ -45,7 +45,7 @@ std::atomic_ullong num_late_commands{0};
 std::atomic_ullong num_timeouts_rx{0};
 std::atomic_ullong num_timeouts_tx{0};
 
-// ★ Ctrl+Cを検知するためのグローバル停止フラグとハンドラ
+// Global stop flag and handler to detect Ctrl+C
 std::atomic<bool> stop_signal_called{false};
 void sig_int_handler(int)
 {
@@ -334,7 +334,7 @@ void benchmark_tx_rate_async_helper(uhd::tx_streamer::sptr tx_stream,
  **********************************************************************/
 int UHD_SAFE_MAIN(int argc, char* argv[])
 {
-    // ★ シグナルハンドラを登録
+    // Register signal handler
     std::signal(SIGINT, &sig_int_handler);
 
     // variables to be set by po
@@ -756,7 +756,7 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         }
     }
 
-    // ★ [変更箇所] 従来の一定時間スリープを廃止し、Ctrl+C変更
+    // [Modified] Removed traditional sleep, use Ctrl+C to stop
     std::cout << std::endl << "Streaming started. Press Ctrl+C to stop..." << std::endl;
     while (not stop_signal_called) {
         std::this_thread::sleep_for(100ms);
