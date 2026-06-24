@@ -581,15 +581,28 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         // User-defined section begin
         double target_freq = 2.4e9; // 2.4GHz
         std::cout << boost::format("[%s] Setting RF frequency to %f MHz...") % NOW() % (target_freq / 1e6) << std::endl;
+        
+        // Added Gain and Antenna configuration
+        double tx_gain = 70.0;
+        double rx_gain = 50.0;
+        std::string tx_ant = "TX/RX";
+        std::string rx_ant = "RX2";
+
         if (vm.count("rx_rate")) {
             for (size_t ch : rx_channel_nums) {
                 usrp->set_rx_freq(uhd::tune_request_t(target_freq), ch);
+                usrp->set_rx_gain(rx_gain, ch);
+                usrp->set_rx_antenna(rx_ant, ch);
             }
+            std::cout << boost::format("[%s] Set RX Gain to %f dB, Antenna to %s") % NOW() % rx_gain % rx_ant << std::endl;
         }
         if (vm.count("tx_rate")) {
             for (size_t ch : tx_channel_nums) {
                 usrp->set_tx_freq(uhd::tune_request_t(target_freq), ch);
+                usrp->set_tx_gain(tx_gain, ch);
+                usrp->set_tx_antenna(tx_ant, ch);
             }
+            std::cout << boost::format("[%s] Set TX Gain to %f dB, Antenna to %s") % NOW() % tx_gain % tx_ant << std::endl;
         }
         // User-defined section end
     }
